@@ -69,20 +69,159 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
   )
 }
 
-# Ingress Rule - Allow all traffic from VPC (for K8s cluster communication)
-resource "aws_vpc_security_group_ingress_rule" "internal" {
+# Kubernetes Ingress Rules - Control Plane
+resource "aws_vpc_security_group_ingress_rule" "k8s_api_server" {
   security_group_id = aws_security_group.main.id
 
-  description = "Allow all internal VPC traffic for K8s cluster"
-  from_port   = 0
-  to_port     = 0
-  ip_protocol = "-1"
+  description = "Kubernetes API Server"
+  from_port   = 6443
+  to_port     = 6443
+  ip_protocol = "tcp"
   cidr_ipv4   = var.vpc_cidr
 
   tags = merge(
     var.tags,
     {
-      Name = "internal-vpc-ingress"
+      Name = "k8s-api-server"
+    }
+  )
+}
+
+resource "aws_vpc_security_group_ingress_rule" "k8s_etcd" {
+  security_group_id = aws_security_group.main.id
+
+  description = "etcd server client API"
+  from_port   = 2379
+  to_port     = 2380
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-etcd"
+    }
+  )
+}
+
+resource "aws_vpc_security_group_ingress_rule" "k8s_kubelet" {
+  security_group_id = aws_security_group.main.id
+
+  description = "Kubelet API"
+  from_port   = 10250
+  to_port     = 10250
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-kubelet"
+    }
+  )
+}
+
+resource "aws_vpc_security_group_ingress_rule" "k8s_scheduler" {
+  security_group_id = aws_security_group.main.id
+
+  description = "kube-scheduler"
+  from_port   = 10259
+  to_port     = 10259
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-scheduler"
+    }
+  )
+}
+
+resource "aws_vpc_security_group_ingress_rule" "k8s_controller_manager" {
+  security_group_id = aws_security_group.main.id
+
+  description = "kube-controller-manager"
+  from_port   = 10257
+  to_port     = 10257
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-controller-manager"
+    }
+  )
+}
+
+# Kubernetes Ingress Rules - NodePort Services
+resource "aws_vpc_security_group_ingress_rule" "k8s_nodeport" {
+  security_group_id = aws_security_group.main.id
+
+  description = "Kubernetes NodePort Services"
+  from_port   = 30000
+  to_port     = 32767
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-nodeport"
+    }
+  )
+}
+
+# Flannel/CNI - Pod network overlay
+resource "aws_vpc_security_group_ingress_rule" "k8s_flannel_vxlan" {
+  security_group_id = aws_security_group.main.id
+
+  description = "Flannel VXLAN overlay network"
+  from_port   = 8472
+  to_port     = 8472
+  ip_protocol = "udp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-flannel-vxlan"
+    }
+  )
+}
+
+resource "aws_vpc_security_group_ingress_rule" "k8s_flannel_health" {
+  security_group_id = aws_security_group.main.id
+
+  description = "Flannel healthcheck"
+  from_port   = 8472
+  to_port     = 8472
+  ip_protocol = "tcp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "k8s-flannel-health"
+    }
+  )
+}
+
+# Allow ICMP for debugging (ping between nodes)
+resource "aws_vpc_security_group_ingress_rule" "icmp" {
+  security_group_id = aws_security_group.main.id
+
+  description = "Allow ICMP (ping) within VPC"
+  from_port   = -1
+  to_port     = -1
+  ip_protocol = "icmp"
+  cidr_ipv4   = var.vpc_cidr
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "icmp-internal"
     }
   )
 }
