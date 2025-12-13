@@ -1,0 +1,89 @@
+# ===============================
+# Maintenance Service Docker Compose
+# ===============================
+# 
+# Database Initialization:
+# - Schema: Created automatically via SQLAlchemy (db.create_all())
+# - Sample Data: Seeded automatically by database_seeder.py on every startup
+# - Backup: PostgreSQL init-db.sql also runs on first container creation
+# - The seeder is idempotent - safe to run multiple times
+#
+# Ports:
+# - Maintenance Service: localhost:5001
+# - PostgreSQL: localhost:5433 (to avoid conflicts with other PostgreSQL instances)
+# - pgAdmin (optional): localhost:5051 (start with --profile admin)
+#
+# 📚 Documentation:
+# - pgAdmin Setup: See PGADMIN_GUIDE.md for web interface access and configuration
+# - API Documentation: See README.md for service endpoints and usage
+
+services:
+  maintenance-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maintenance-service
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres-maintenance:
+        condition: service_healthy
+    environment:
+      FLASK_ENV: development
+      FLASK_APP: run.py
+      DATABASE_URL: "postgresql://postgres:postgres@postgres-maintenance:5432/maintenance_db"
+      PORT: 5001
+      HOST: "0.0.0.0"
+      CORS_ORIGINS: "*"
+    volumes:
+      - ./:/app
+    restart: always
+    networks:
+      - maintenance-network
+
+  postgres-maintenance:
+    image: postgres:16
+    container_name: postgres-maintenance
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: maintenance_db
+    ports:
+      - "5433:5432"          # host:container (use 5433 on host to avoid conflicts)
+    volumes:
+      - maintenance_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d maintenance_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - maintenance-network
+
+  # Optional: pgAdmin for database management
+  # To start: docker-compose --profile admin up -d
+  # 📚 See PGADMIN_GUIDE.md for detailed setup and connection instructions
+  pgadmin-maintenance:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin-maintenance
+    environment:
+      # Login credentials for pgAdmin web interface (http://localhost:5051)
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5051:80"          # Access at http://localhost:5051
+    depends_on:
+      - postgres-maintenance
+    networks:
+      - maintenance-network
+    profiles:
+      - admin              # Only starts with --profile admin flag
+
+volumes:
+  maintenance_pg_data:
+
+networks:
+  maintenance-network:
+    driver: bridge
+
+
